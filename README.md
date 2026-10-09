@@ -7,9 +7,9 @@ Free planning poker and retrospectives by Vachi Services. No sign-up, and built 
 - One Next.js app on Vercel. Browsers only talk to the site's own address over HTTPS.
 - Room state lives in Supabase Postgres as one JSON document per room (`poker` at `/p/CODE`, `retro` at `/r/CODE`).
 - Most changes are saved with optimistic concurrency on `rooms.version`; a conflict returns the newer room in the same round trip (`qp_update_room`).
-- The clicks a whole team makes at once (a poker vote, a new retro card, a retro vote) run in Postgres under a row lock (`qp_apply_op`), so a burst queues instead of retrying.
+- The clicks a whole team makes at once (joining, a poker vote, a new retro card, a retro vote) run in Postgres under a row lock (`qp_room_op`), so a burst queues instead of retrying.
 - After every change the server sends a Supabase Realtime broadcast carrying only the new version number. Browsers then read the room from `/api/rooms/{code}`, which hides votes and other people's draft retro cards.
-- If Realtime is blocked, browsers poll `/api/rooms/{code}?since={version}` every 2 seconds (3.5 when the room is quiet, 15 when the tab is hidden). An unchanged room answers `204` after one small query.
+- If Realtime is blocked, browsers poll `/api/rooms/{code}?since={version}` every 2 seconds (5 when the room is quiet, 15 when the tab is hidden). Every poll is a single database call (`qp_read_room`); an unchanged room answers `204`.
 - No accounts: joining returns a per-room secret kept in the browser; the database stores only its hash.
 - Rate limits apply per participant, not per IP address, because a whole office can share one company IP.
 - A `pg_cron` job deletes rooms 24 hours after their last use.

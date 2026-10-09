@@ -3,7 +3,9 @@ import { broadcastRoomChanged } from "./broadcast";
 import { hashSecret, newId, newRoomCode, newSecret } from "./ids";
 import {
   applyPokerAction,
+  cleanText,
   createPokerRoom,
+  LIMITS,
   joinPokerRoom,
   pokerView,
   RoomError,
@@ -13,7 +15,7 @@ import {
   type PokerView,
 } from "./poker";
 import { applyRetroAction, createRetroRoom, RETRO_LIMITS, joinRetroRoom, retroView, type RetroAction, type RetroState, type RetroView } from "./retro";
-import { getStore, OpError, type HotOp } from "./store";
+import { getStore, OpError, type HotOp, type Presence } from "./store";
 
 const ctx = () => ({ newId, now: Date.now() });
 
@@ -82,15 +84,15 @@ function authenticate(state: AnyState, identity: Identity | null): string | null
 const SAVE_BUDGET_MS = 9_000;
 const NOT_FOUND = "This room doesn't exist. Rooms are deleted 24 hours after their last use.";
 
-async function mutate(code: string, change: (state: AnyState) => AnyState) {
+async function mutate(code: string, change: (state: AnyState) => AnyState, loaded?: Awaited<ReturnType<typeof load>>) {
   const store = getStore();
   const started = Date.now();
-  let record = await load(code);
+  let record = loaded ?? (await load(code));
   for (let attempt = 0; ; attempt++) {
     const next = change(record.state);
     const result = await store.update(code, record.version, next);
     if (result.ok) {
-      await broadcastRoomChanged(code, result.version);
+      broadcastRoomChanged(code, result.version);
       return { state: next, version: result.version };
     }
     if (!result.current) throw new RoomError(NOT_FOUND, 404);
@@ -101,17 +103,35 @@ async function mutate(code: string, change: (state: AnyState) => AnyState) {
   }
 }
 
+async function runOp(code: string, op: HotOp, local: (s: AnyState) => AnyState) {
+  try {
+    const result = await getStore().applyOp(code, op, (s) => local(s as AnyState));
+    broadcastRoomChanged(code, result.version);
+    return { state: result.state as AnyState, version: result.version, presence: result.presence };
+  } catch (err) {
+    if (err instanceof OpError) throw new RoomError(err.message, err.status);
+    throw err;
+  }
+}
+
+// Joining is the biggest burst of all (everyone opens the link when the
+// meeting starts), so it goes to Postgres as one atomic step without a read.
 export async function joinRoom(code: string, input: Record<string, unknown>): Promise<Joined> {
   const participantId = newId();
   const secret = newSecret();
-  const participant = { id: participantId, secretHash: hashSecret(secret) };
-  const { state, version } = await mutate(code, (s) =>
+  const participant: Participant = {
+    id: participantId,
+    name: cleanText(input.name, LIMITS.name, "name"),
+    role: input.role === "observer" ? "observer" : "voter",
+    secretHash: hashSecret(secret),
+    joinedAt: Date.now(),
+  };
+  const op: HotOp = { type: "join", actor: participantId, participant, maxParticipants: Math.min(LIMITS.participants, RETRO_LIMITS.participants) };
+  const { state, version, presence } = await runOp(code, op, (s) =>
     s.kind === "retro"
-      ? joinRetroRoom(s, { name: input.name }, participant, ctx())
-      : joinPokerRoom(s, { name: input.name, role: input.role }, participant, ctx()),
+      ? joinRetroRoom(s, { name: participant.name }, participant, ctx())
+      : joinPokerRoom(s, { name: participant.name, role: participant.role }, participant, ctx()),
   );
-  await getStore().heartbeat(code, participantId);
-  const presence = await getStore().presence(code);
   return { code, participantId, secret, version, room: view(state, participantId, presence) };
 }
 
@@ -148,42 +168,31 @@ export async function actInRoom(code: string, identity: Identity | null, action:
   const op = hotOp(record.state, actorId, action, preview);
   let state: AnyState;
   let version: number;
+  let presence: Presence;
   if (op) {
-    try {
-      const card = op.type === "retro.addCard" ? (op.card as { id: string }) : null;
-      // The memory store replays the same change; reuse the card id from the preview.
-      const local = (s: unknown) => applyAction(s as AnyState, actorId, action, { newId: () => card?.id ?? newId(), now: Date.now() });
-      const result = await getStore().applyOp(code, op, local);
-      state = result.state as AnyState;
-      version = result.version;
-    } catch (err) {
-      if (err instanceof OpError) throw new RoomError(err.message, err.status);
-      throw err;
-    }
-    await broadcastRoomChanged(code, version);
+    const card = op.type === "retro.addCard" ? (op.card as { id: string }) : null;
+    // The memory store replays the same change; reuse the card id from the preview.
+    ({ state, version, presence } = await runOp(code, op, (s) =>
+      applyAction(s, actorId, action, { newId: () => card?.id ?? newId(), now: Date.now() }),
+    ));
   } else {
-    ({ state, version } = await mutate(code, (s) => applyAction(s, actorId, action)));
+    ({ state, version } = await mutate(code, (s) => applyAction(s, actorId, action), record));
+    presence = await getStore().presence(code);
   }
-  const presence = await getStore().presence(code);
   return { version, room: view(state, actorId in state.participants ? actorId : null, presence) };
 }
 
 /**
- * The polling read. Most polls find nothing new, so they cost one tiny query
- * (the version number). The browser asks for a heartbeat every 20 seconds or
- * so, not on every poll, to keep "who's online" fresh without a write per poll.
+ * The polling read: one database round trip. Most polls find nothing new and
+ * get back just the version number. The browser asks for a heartbeat every 20
+ * seconds or so, not on every poll, to keep "who's online" fresh.
  */
 export async function readRoom(code: string, identity: Identity | null, since: number | null, heartbeat: boolean) {
-  const store = getStore();
-  if (since !== null && !heartbeat) {
-    const version = await store.getVersion(code);
-    if (version === null) throw new RoomError(NOT_FOUND, 404);
-    if (version === since) return null;
-  }
-  const record = await load(code);
-  const viewerId = authenticate(record.state, identity);
-  if (viewerId && heartbeat) await store.heartbeat(code, viewerId);
-  if (since !== null && since === record.version) return null;
-  const presence = await store.presence(code);
-  return { version: record.version, room: view(record.state, viewerId, presence) };
+  const viewer = identity ? { id: identity.participantId, hash: hashSecret(identity.secret) } : null;
+  const result = await getStore().read(code, since, viewer, heartbeat);
+  if (!result || (result.kind !== "poker" && result.kind !== "retro")) throw new RoomError(NOT_FOUND, 404);
+  if (result.state === null) return null;
+  const state = result.state as AnyState;
+  const viewerId = authenticate(state, identity);
+  return { version: result.version, room: view(state, viewerId, result.presence ?? {}) };
 }

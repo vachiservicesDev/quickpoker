@@ -8,7 +8,19 @@ export interface RoomRecord<S = unknown> {
   version: number;
 }
 
-export type HotOp = { type: "poker.vote" | "retro.addCard" | "retro.vote" | "retro.unvote"; actor: string } & Record<string, unknown>;
+export type HotOp = { type: "join" | "poker.vote" | "retro.addCard" | "retro.vote" | "retro.unvote"; actor: string } & Record<string, unknown>;
+export type Presence = Record<string, number>;
+export interface ReadResult {
+  version: number;
+  kind: string;
+  state: unknown | null;
+  presence: Presence | null;
+}
+export interface OpResult {
+  version: number;
+  state: unknown;
+  presence: Presence;
+}
 
 /** Errors raised by qp_apply_op look like "qp:409:message". */
 export class OpError extends Error {
@@ -21,8 +33,12 @@ export type UpdateResult = { ok: true; version: number } | { ok: false; current:
 
 export interface RoomStore {
   get<S>(code: string): Promise<RoomRecord<S> | null>;
-  /** Just the version number: the cheap check most polls need. */
-  getVersion(code: string): Promise<number | null>;
+  /**
+   * The polling read, in one round trip. State and presence are null when the
+   * room hasn't changed since `since`. With `beat`, also records that the
+   * viewer is online, if their secret hash matches. Null if the room is gone.
+   */
+  read(code: string, since: number | null, viewer: { id: string; hash: string } | null, beat: boolean): Promise<ReadResult | null>;
   /** Returns false when the code is already taken. */
   insert(code: string, kind: string, state: unknown): Promise<boolean>;
   /**
@@ -32,9 +48,9 @@ export interface RoomStore {
   update(code: string, expectedVersion: number, state: unknown): Promise<UpdateResult>;
   /**
    * Applies one of the busiest clicks atomically. Supabase runs it in Postgres
-   * under a row lock (see qp_apply_op); the memory store runs `local` directly.
+   * under a row lock (see qp_room_op); the memory store runs `local` directly.
    */
-  applyOp(code: string, op: HotOp, local: (state: unknown) => unknown): Promise<{ version: number; state: unknown }>;
+  applyOp(code: string, op: HotOp, local: (state: unknown) => unknown): Promise<OpResult>;
   heartbeat(code: string, participantId: string): Promise<void>;
   presence(code: string): Promise<Record<string, number>>;
   saveFeedback(entry: { message: string; contact: string | null; page: string | null }): Promise<void>;
@@ -49,10 +65,16 @@ class SupabaseStore implements RoomStore {
     return (data as RoomRecord<S> | null) ?? null;
   }
 
-  async getVersion(code: string) {
-    const { data, error } = await this.db.from("rooms").select("version").eq("code", code).maybeSingle();
+  async read(code: string, since: number | null, viewer: { id: string; hash: string } | null, beat: boolean) {
+    const { data, error } = await this.db.rpc("qp_read_room", {
+      p_code: code,
+      p_since: since,
+      p_viewer: viewer?.id ?? null,
+      p_viewer_hash: viewer?.hash ?? null,
+      p_beat: beat,
+    });
     if (error) throw error;
-    return (data?.version as number | undefined) ?? null;
+    return ((data as ReadResult[] | null)?.[0] ?? null) as ReadResult | null;
   }
 
   async insert(code: string, kind: string, state: unknown) {
@@ -72,14 +94,14 @@ class SupabaseStore implements RoomStore {
   }
 
   async applyOp(code: string, op: HotOp) {
-    const { data, error } = await this.db.rpc("qp_apply_op", { p_code: code, p_op: op });
+    const { data, error } = await this.db.rpc("qp_room_op", { p_code: code, p_op: op });
     if (error) {
       const m = /^qp:(\d{3}):([\s\S]*)$/.exec(error.message ?? "");
       if (m) throw new OpError(m[2], Number(m[1]));
       throw error;
     }
-    const row = (data as { new_version: number; new_state: unknown }[])[0];
-    return { version: row.new_version, state: row.new_state };
+    const row = (data as { new_version: number; new_state: unknown; new_presence: Presence }[])[0];
+    return { version: row.new_version, state: row.new_state, presence: row.new_presence ?? {} };
   }
 
   async heartbeat(code: string, participantId: string) {
@@ -117,8 +139,13 @@ class MemoryStore implements RoomStore {
     return structuredClone({ code: room.code, kind: room.kind, state: room.state as S, version: room.version });
   }
 
-  async getVersion(code: string) {
-    return this.rooms.get(code)?.version ?? null;
+  async read(code: string, since: number | null, viewer: { id: string; hash: string } | null, beat: boolean) {
+    const room = this.rooms.get(code);
+    if (!room) return null;
+    const participants = (room.state as { participants?: Record<string, { secretHash?: string }> }).participants ?? {};
+    if (beat && viewer && participants[viewer.id]?.secretHash === viewer.hash) await this.heartbeat(code, viewer.id);
+    if (since !== null && since === room.version) return { version: room.version, kind: room.kind, state: null, presence: null };
+    return { version: room.version, kind: room.kind, state: structuredClone(room.state), presence: await this.presence(code) };
   }
 
   async insert(code: string, kind: string, state: unknown) {
@@ -139,14 +166,15 @@ class MemoryStore implements RoomStore {
     return { ok: true, version: room.version };
   }
 
-  async applyOp(code: string, _op: HotOp, local: (state: unknown) => unknown) {
+  async applyOp(code: string, op: HotOp, local: (state: unknown) => unknown) {
     const room = this.rooms.get(code);
     if (!room) throw new OpError("This room doesn't exist. Rooms are deleted 24 hours after their last use.", 404);
     // No await between read and write, so this is atomic in a single process.
     room.state = structuredClone(local(structuredClone(room.state)));
     room.version += 1;
     room.lastActive = Date.now();
-    return { version: room.version, state: structuredClone(room.state) };
+    if (op.type === "join") await this.heartbeat(code, op.actor);
+    return { version: room.version, state: structuredClone(room.state), presence: await this.presence(code) };
   }
 
   async heartbeat(code: string, participantId: string) {

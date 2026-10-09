@@ -15,7 +15,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 class SlowStore extends MemoryStore {
   async get<S>(code: string) { await sleep(DB_MS); return super.get<S>(code); }
-  async getVersion(code: string) { await sleep(DB_MS / 2); return super.getVersion(code); }
+  async read(code: string, since: number | null, viewer: { id: string; hash: string } | null, beat: boolean) { await sleep(DB_MS); return super.read(code, since, viewer, beat); }
   async insert(code: string, kind: string, state: unknown) { await sleep(DB_MS); return super.insert(code, kind, state); }
   async update(code: string, v: number, state: unknown) { await sleep(DB_MS); return super.update(code, v, state); }
   async heartbeat(code: string, id: string) { await sleep(DB_MS); return super.heartbeat(code, id); }

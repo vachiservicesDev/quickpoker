@@ -18,7 +18,7 @@ interface Identity {
 // Polling budget. With 100 teams of 10 people this is what keeps the request
 // rate inside what Vercel and Supabase can comfortably serve.
 const FAST_POLL_MS = 2000; // Realtime blocked, room busy
-const IDLE_POLL_MS = 3500; // Realtime blocked, nothing changed for a minute
+const IDLE_POLL_MS = 5000; // Realtime blocked, nothing changed for a minute
 const IDLE_AFTER_MS = 60_000;
 const HIDDEN_POLL_MS = 15_000; // tab in the background
 const LIVE_POLL_MS = 20_000; // safety net while Realtime is connected
