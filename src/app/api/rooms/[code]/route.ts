@@ -3,11 +3,12 @@ import { readRoom } from "@/lib/rooms";
 
 export async function GET(req: Request, ctx: RouteContext<"/api/rooms/[code]">) {
   return handle(async () => {
-    rateLimit(req, "read", 240);
+    rateLimit(req, "read", req.headers.has("x-qp-participant") ? 240 : 1200);
     const code = codeFrom((await ctx.params).code);
     const sinceParam = new URL(req.url).searchParams.get("since");
     const since = sinceParam && /^\d+$/.test(sinceParam) ? Number(sinceParam) : null;
-    const result = await readRoom(code, identityFrom(req), since);
+    const heartbeat = new URL(req.url).searchParams.get("hb") === "1";
+    const result = await readRoom(code, identityFrom(req), since, heartbeat);
     if (!result) return new Response(null, { status: 204, headers: noStore });
     return Response.json(result, { headers: noStore });
   });

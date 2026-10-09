@@ -8,12 +8,33 @@ export interface RoomRecord<S = unknown> {
   version: number;
 }
 
+export type HotOp = { type: "poker.vote" | "retro.addCard" | "retro.vote" | "retro.unvote"; actor: string } & Record<string, unknown>;
+
+/** Errors raised by qp_apply_op look like "qp:409:message". */
+export class OpError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+export type UpdateResult = { ok: true; version: number } | { ok: false; current: RoomRecord | null };
+
 export interface RoomStore {
   get<S>(code: string): Promise<RoomRecord<S> | null>;
+  /** Just the version number: the cheap check most polls need. */
+  getVersion(code: string): Promise<number | null>;
   /** Returns false when the code is already taken. */
   insert(code: string, kind: string, state: unknown): Promise<boolean>;
-  /** Writes only if the stored version still matches. Returns the new version, or null on a conflict. */
-  update(code: string, expectedVersion: number, state: unknown): Promise<number | null>;
+  /**
+   * Writes only if the stored version still matches. On a conflict, returns the
+   * current room (or null if it was deleted) so the caller can retry at once.
+   */
+  update(code: string, expectedVersion: number, state: unknown): Promise<UpdateResult>;
+  /**
+   * Applies one of the busiest clicks atomically. Supabase runs it in Postgres
+   * under a row lock (see qp_apply_op); the memory store runs `local` directly.
+   */
+  applyOp(code: string, op: HotOp, local: (state: unknown) => unknown): Promise<{ version: number; state: unknown }>;
   heartbeat(code: string, participantId: string): Promise<void>;
   presence(code: string): Promise<Record<string, number>>;
   saveFeedback(entry: { message: string; contact: string | null; page: string | null }): Promise<void>;
@@ -28,6 +49,12 @@ class SupabaseStore implements RoomStore {
     return (data as RoomRecord<S> | null) ?? null;
   }
 
+  async getVersion(code: string) {
+    const { data, error } = await this.db.from("rooms").select("version").eq("code", code).maybeSingle();
+    if (error) throw error;
+    return (data?.version as number | undefined) ?? null;
+  }
+
   async insert(code: string, kind: string, state: unknown) {
     const { error } = await this.db.from("rooms").insert({ code, kind, state, version: 1 });
     if (error?.code === "23505") return false;
@@ -35,15 +62,24 @@ class SupabaseStore implements RoomStore {
     return true;
   }
 
-  async update(code: string, expectedVersion: number, state: unknown) {
-    const { data, error } = await this.db
-      .from("rooms")
-      .update({ state, version: expectedVersion + 1, last_active_at: new Date().toISOString() })
-      .eq("code", code)
-      .eq("version", expectedVersion)
-      .select("version");
+  async update(code: string, expectedVersion: number, state: unknown): Promise<UpdateResult> {
+    const { data, error } = await this.db.rpc("qp_update_room", { p_code: code, p_expected: expectedVersion, p_state: state });
     if (error) throw error;
-    return data && data.length > 0 ? (data[0].version as number) : null;
+    const row = (data as { ok: boolean; version: number; kind: string; state: unknown }[] | null)?.[0];
+    if (!row) return { ok: false, current: null };
+    if (row.ok) return { ok: true, version: row.version };
+    return { ok: false, current: { code, kind: row.kind, state: row.state, version: row.version } };
+  }
+
+  async applyOp(code: string, op: HotOp) {
+    const { data, error } = await this.db.rpc("qp_apply_op", { p_code: code, p_op: op });
+    if (error) {
+      const m = /^qp:(\d{3}):([\s\S]*)$/.exec(error.message ?? "");
+      if (m) throw new OpError(m[2], Number(m[1]));
+      throw error;
+    }
+    const row = (data as { new_version: number; new_state: unknown }[])[0];
+    return { version: row.new_version, state: row.new_state };
   }
 
   async heartbeat(code: string, participantId: string) {
@@ -81,19 +117,36 @@ class MemoryStore implements RoomStore {
     return structuredClone({ code: room.code, kind: room.kind, state: room.state as S, version: room.version });
   }
 
+  async getVersion(code: string) {
+    return this.rooms.get(code)?.version ?? null;
+  }
+
   async insert(code: string, kind: string, state: unknown) {
     if (this.rooms.has(code)) return false;
     this.rooms.set(code, { code, kind, state: structuredClone(state), version: 1, lastActive: Date.now() });
     return true;
   }
 
-  async update(code: string, expectedVersion: number, state: unknown) {
+  async update(code: string, expectedVersion: number, state: unknown): Promise<UpdateResult> {
     const room = this.rooms.get(code);
-    if (!room || room.version !== expectedVersion) return null;
+    if (!room) return { ok: false, current: null };
+    if (room.version !== expectedVersion) {
+      return { ok: false, current: structuredClone({ code, kind: room.kind, state: room.state, version: room.version }) };
+    }
     room.state = structuredClone(state);
     room.version += 1;
     room.lastActive = Date.now();
-    return room.version;
+    return { ok: true, version: room.version };
+  }
+
+  async applyOp(code: string, _op: HotOp, local: (state: unknown) => unknown) {
+    const room = this.rooms.get(code);
+    if (!room) throw new OpError("This room doesn't exist. Rooms are deleted 24 hours after their last use.", 404);
+    // No await between read and write, so this is atomic in a single process.
+    room.state = structuredClone(local(structuredClone(room.state)));
+    room.version += 1;
+    room.lastActive = Date.now();
+    return { version: room.version, state: structuredClone(room.state) };
   }
 
   async heartbeat(code: string, participantId: string) {

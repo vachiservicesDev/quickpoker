@@ -9,9 +9,16 @@ const steps = [
   { n: "04", title: "Vote and reveal", body: "Everyone picks a card, the facilitator reveals, and the estimate is saved to the story." },
 ];
 
+const retroFacts = [
+  { title: "Four formats", body: "Went well, To improve, Try next. Start, Stop, Continue. Mad, Sad, Glad. Or the 4 Ls." },
+  { title: "Anonymous cards", body: "Cards don't show who wrote them, and stay hidden until the facilitator reveals them." },
+  { title: "Dot voting and a timer", body: "Everyone gets a few votes, the board sorts itself, and a shared timer keeps it moving." },
+  { title: "Print, email or download", body: "Save the board as a PDF, email the summary to your team, or download it as a spreadsheet." },
+];
+
 const networkFacts = [
   { title: "One address", body: "Pages and room updates come from the same website, so there is nothing extra for IT to allow." },
-  { title: "Plain HTTPS fallback", body: "If live updates are blocked, the room checks for changes every second or two instead." },
+  { title: "Plain HTTPS fallback", body: "If live updates are blocked, the room checks for changes every few seconds instead." },
   { title: "Gone in 24 hours", body: "Rooms, votes and stories are deleted a day after the room was last used." },
   { title: "No accounts", body: "We store only the display name you type, and only for that room." },
 ];
@@ -24,11 +31,11 @@ export default function Home() {
         <section className="grid-bg border-b border-line bg-subtle">
           <div className="container-page flex flex-col gap-12 py-16 md:py-24">
             <div className="flex max-w-3xl flex-col">
-              <p className="t-eyebrow">Free planning poker, no sign-up</p>
+              <p className="t-eyebrow">Free planning poker and retros, no sign-up</p>
               <h1 className="t-display mt-4">Estimate together, from any network.</h1>
               <p className="t-lead mt-6 max-w-[42rem]">
-                Create a room, share the link and start voting. QuickPoker runs as an ordinary website, so it opens behind
-                company firewalls and VPNs. Rooms are deleted 24 hours after their last use.
+                Estimate stories with planning poker or run your sprint retro, then share the link. QuickPoker runs as an
+                ordinary website, so it opens behind company firewalls and VPNs. Rooms are deleted 24 hours after their last use.
               </p>
             </div>
             <StartRoom />
@@ -50,6 +57,24 @@ export default function Home() {
                 </li>
               ))}
             </ol>
+          </div>
+        </section>
+
+        <section id="retros" className="scroll-mt-20 border-t border-line bg-subtle">
+          <div className="container-page flex flex-wrap gap-12 py-20 md:py-28">
+            <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-3">
+              <p className="t-eyebrow">Retrospectives</p>
+              <h2 className="t-h2">Run the retro in the same place.</h2>
+              <p className="t-lead mt-2">Pick a format, set a timer, and let everyone write privately before the cards are revealed.</p>
+            </div>
+            <ul className="grid min-w-0 flex-[1_1_520px] gap-8 sm:grid-cols-2">
+              {retroFacts.map((f) => (
+                <li key={f.title} className="flex flex-col gap-2 border-t-2 border-ink pt-5">
+                  <h3 className="text-lg font-semibold">{f.title}</h3>
+                  <p className="text-[15px] text-ink-2">{f.body}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 

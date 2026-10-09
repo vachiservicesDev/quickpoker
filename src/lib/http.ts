@@ -28,11 +28,14 @@ export async function readJson(req: Request): Promise<Record<string, unknown>> {
 
 // A small per-instance limiter. It won't stop a determined attacker across
 // many serverless instances, but it blunts accidental loops and casual abuse.
+// Requests from someone already in a room are limited per person, not per IP:
+// a whole office can sit behind one company IP address.
 const buckets = new Map<string, { tokens: number; at: number }>();
 
 export function rateLimit(req: Request, scope: string, perMinute: number) {
+  const participant = req.headers.get("x-qp-participant");
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const key = `${scope}:${ip}`;
+  const key = participant ? `${scope}:p:${participant.slice(0, 32)}` : `${scope}:ip:${ip}`;
   const now = Date.now();
   const bucket = buckets.get(key) ?? { tokens: perMinute, at: now };
   bucket.tokens = Math.min(perMinute, bucket.tokens + ((now - bucket.at) / 60_000) * perMinute);
@@ -40,7 +43,7 @@ export function rateLimit(req: Request, scope: string, perMinute: number) {
   if (bucket.tokens < 1) throw new RoomError("Too many requests. Wait a moment and try again.", 429);
   bucket.tokens -= 1;
   buckets.set(key, bucket);
-  if (buckets.size > 10_000) buckets.clear();
+  if (buckets.size > 50_000) buckets.clear();
 }
 
 export function handle(fn: () => Promise<Response>): Promise<Response> {

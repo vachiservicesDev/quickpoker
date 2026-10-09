@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PokerAction, PokerView } from "./poker";
+export interface RoomViewBase {
+  kind: string;
+  name: string;
+  me: object | null;
+}
 
 export type ConnectionMode = "connecting" | "live" | "compatible" | "offline";
 type Status = "loading" | "join" | "ready" | "missing";
@@ -11,9 +15,14 @@ interface Identity {
   secret: string;
 }
 
-const FAST_POLL_MS = 1500;
-const HIDDEN_POLL_MS = 10_000;
-const LIVE_POLL_MS = 15_000; // safety net while Realtime is connected
+// Polling budget. With 100 teams of 10 people this is what keeps the request
+// rate inside what Vercel and Supabase can comfortably serve.
+const FAST_POLL_MS = 2000; // Realtime blocked, room busy
+const IDLE_POLL_MS = 3500; // Realtime blocked, nothing changed for a minute
+const IDLE_AFTER_MS = 60_000;
+const HIDDEN_POLL_MS = 15_000; // tab in the background
+const LIVE_POLL_MS = 20_000; // safety net while Realtime is connected
+const HEARTBEAT_MS = 20_000; // tells the room you're still here
 const FULL_REFRESH_MS = 30_000; // picks up who's online even when nothing else changed
 
 const storageKey = (code: string) => `qp:id:${code}`;
@@ -42,9 +51,9 @@ function clearIdentity(code: string) {
   } catch {}
 }
 
-export function useRoom(code: string) {
+export function useRoom<V extends RoomViewBase, A extends { type: string } = { type: string }>(code: string) {
   const [status, setStatus] = useState<Status>("loading");
-  const [room, setRoom] = useState<PokerView | null>(null);
+  const [room, setRoom] = useState<V | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<ConnectionMode>("connecting");
 
@@ -52,6 +61,8 @@ export function useRoom(code: string) {
   const version = useRef(0);
   const realtimeUp = useRef(false);
   const lastFull = useRef(0);
+  const lastBeat = useRef(0);
+  const lastChange = useRef(0); // set on first load, so a new room starts on the fast poll
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = useRef(false);
   const failures = useRef(0);
@@ -62,8 +73,9 @@ export function useRoom(code: string) {
   }, []);
 
   const apply = useCallback(
-    (data: { version: number; room: PokerView }) => {
+    (data: { version: number; room: V }) => {
       if (data.version < version.current) return;
+      if (data.version > version.current) lastChange.current = Date.now();
       version.current = data.version;
       setRoom(data.room);
       if (identity.current && !data.room.me) {
@@ -80,11 +92,17 @@ export function useRoom(code: string) {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
-      const full = Date.now() - lastFull.current > FULL_REFRESH_MS || version.current === 0;
-      const url = full ? `/api/rooms/${code}` : `/api/rooms/${code}?since=${version.current}`;
-      const res = await fetch(url, { headers: headers(), cache: "no-store" });
+      const now = Date.now();
+      const full = now - lastFull.current > FULL_REFRESH_MS || version.current === 0;
+      const beat = identity.current !== null && now - lastBeat.current > HEARTBEAT_MS;
+      const params = new URLSearchParams();
+      if (!full) params.set("since", String(version.current));
+      if (beat) params.set("hb", "1");
+      const qs = params.toString();
+      const res = await fetch(`/api/rooms/${code}${qs ? `?${qs}` : ""}`, { headers: headers(), cache: "no-store" });
       failures.current = 0;
-      if (full) lastFull.current = Date.now();
+      if (full) lastFull.current = now;
+      if (beat) lastBeat.current = now;
       if (res.status === 204) return;
       if (res.status === 404) {
         setStatus("missing");
@@ -108,7 +126,8 @@ export function useRoom(code: string) {
     const tick = async () => {
       await refresh();
       if (stopped) return;
-      const delay = realtimeUp.current ? LIVE_POLL_MS : document.hidden ? HIDDEN_POLL_MS : FAST_POLL_MS;
+      const idle = Date.now() - lastChange.current > IDLE_AFTER_MS;
+      const delay = realtimeUp.current ? LIVE_POLL_MS : document.hidden ? HIDDEN_POLL_MS : idle ? IDLE_POLL_MS : FAST_POLL_MS;
       timer.current = setTimeout(tick, delay);
     };
     tick();
@@ -176,7 +195,7 @@ export function useRoom(code: string) {
   );
 
   const act = useCallback(
-    async (action: PokerAction) => {
+    async (action: A) => {
       setError(null);
       const res = await fetch(`/api/rooms/${code}/actions`, {
         method: "POST",
@@ -193,6 +212,7 @@ export function useRoom(code: string) {
         }
         return false;
       }
+      lastChange.current = Date.now();
       if (action.type === "leave") {
         identity.current = null;
         clearIdentity(code);

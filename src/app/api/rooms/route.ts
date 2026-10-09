@@ -3,7 +3,7 @@ import { createRoom } from "@/lib/rooms";
 
 export async function POST(req: Request) {
   return handle(async () => {
-    rateLimit(req, "create", 20);
+    rateLimit(req, "create", 120);
     const joined = await createRoom(await readJson(req));
     return Response.json(joined, { status: 201, headers: noStore });
   });

@@ -74,7 +74,7 @@ export interface Ctx {
   now: number;
 }
 
-function cleanText(value: unknown, max: number, field: string): string {
+export function cleanText(value: unknown, max: number, field: string): string {
   if (typeof value !== "string") throw new RoomError(`Enter a ${field}.`);
   const text = value.replace(/\s+/g, " ").trim();
   if (!text) throw new RoomError(`Enter a ${field}.`);
