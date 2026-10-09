@@ -29,6 +29,12 @@ export class OpError extends Error {
   }
 }
 
+export interface Beat {
+  code: string;
+  id: string;
+  hash: string;
+}
+
 export type UpdateResult = { ok: true; version: number } | { ok: false; current: RoomRecord | null };
 
 export interface RoomStore {
@@ -52,6 +58,8 @@ export interface RoomStore {
    */
   applyOp(code: string, op: HotOp, local: (state: unknown) => unknown): Promise<OpResult>;
   heartbeat(code: string, participantId: string): Promise<void>;
+  /** Many heartbeats in one call; each counts only if its secret hash matches. */
+  heartbeats(beats: Beat[]): Promise<void>;
   presence(code: string): Promise<Record<string, number>>;
   saveFeedback(entry: { message: string; contact: string | null; page: string | null }): Promise<void>;
 }
@@ -110,6 +118,11 @@ class SupabaseStore implements RoomStore {
       .upsert({ room_code: code, participant_id: participantId, last_seen: new Date().toISOString() });
     // A heartbeat for a room deleted a moment ago is harmless; ignore the foreign key error.
     if (error && error.code !== "23503") throw error;
+  }
+
+  async heartbeats(beats: Beat[]) {
+    const { error } = await this.db.rpc("qp_heartbeats", { p_beats: beats });
+    if (error) throw error;
   }
 
   async presence(code: string) {
@@ -181,6 +194,13 @@ class MemoryStore implements RoomStore {
     const room = this.seen.get(code) ?? {};
     room[participantId] = Date.now();
     this.seen.set(code, room);
+  }
+
+  async heartbeats(beats: Beat[]) {
+    for (const b of beats) {
+      const participants = (this.rooms.get(b.code)?.state as { participants?: Record<string, { secretHash?: string }> } | undefined)?.participants;
+      if (participants?.[b.id]?.secretHash === b.hash) await this.heartbeat(b.code, b.id);
+    }
   }
 
   async presence(code: string) {

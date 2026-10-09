@@ -15,6 +15,7 @@ import {
   type PokerView,
 } from "./poker";
 import { applyRetroAction, createRetroRoom, RETRO_LIMITS, joinRetroRoom, retroView, type RetroAction, type RetroState, type RetroView } from "./retro";
+import { queueHeartbeat, remember, snapshot } from "./roomCache";
 import { getStore, OpError, type HotOp, type Presence } from "./store";
 
 const ctx = () => ({ newId, now: Date.now() });
@@ -69,6 +70,20 @@ async function load(code: string) {
   return record;
 }
 
+// The room as this server saw it within the last second (see roomCache).
+async function loadRecent(code: string, minVersion = 0) {
+  const snap = await snapshot(
+    code,
+    async () => {
+      const r = await getStore().read(code, null, null, false);
+      return r && r.state !== null ? { version: r.version, kind: r.kind, state: r.state, presence: r.presence ?? {} } : null;
+    },
+    minVersion,
+  );
+  if (!snap || (snap.kind !== "poker" && snap.kind !== "retro")) throw new RoomError(NOT_FOUND, 404);
+  return { code, kind: snap.kind, state: snap.state as AnyState, version: snap.version, presence: snap.presence };
+}
+
 function authenticate(state: AnyState, identity: Identity | null): string | null {
   if (!identity) return null;
   const p: Participant | undefined = state.participants[identity.participantId];
@@ -107,6 +122,7 @@ async function runOp(code: string, op: HotOp, local: (s: AnyState) => AnyState) 
   try {
     const result = await getStore().applyOp(code, op, (s) => local(s as AnyState));
     broadcastRoomChanged(code, result.version);
+    remember(code, { version: result.version, kind: (result.state as AnyState).kind, state: result.state, presence: result.presence });
     return { state: result.state as AnyState, version: result.version, presence: result.presence };
   } catch (err) {
     if (err instanceof OpError) throw new RoomError(err.message, err.status);
@@ -159,12 +175,25 @@ function applyAction(s: AnyState, actorId: string, action: PokerAction | RetroAc
 }
 
 export async function actInRoom(code: string, identity: Identity | null, action: PokerAction | RetroAction) {
-  const record = await load(code);
-  const actorId = authenticate(record.state, identity);
-  if (!actorId) throw new RoomError("Join the room first.", 401);
-
-  // Check the action against the room as we just read it, for friendly errors.
-  const preview = applyAction(record.state, actorId, action);
+  // Start from the room as seen within the last second. Postgres checks the
+  // busy clicks again under a lock, and other saves fail on a stale version and
+  // retry against the current room, so a slightly old copy is safe here.
+  let record = await loadRecent(code);
+  let actorId = authenticate(record.state, identity);
+  let preview: AnyState | null = null;
+  try {
+    if (actorId) preview = applyAction(record.state, actorId, action);
+  } catch (err) {
+    if (!(err instanceof RoomError)) throw err;
+  }
+  if (!actorId || !preview) {
+    // Before refusing, make sure the copy wasn't just out of date.
+    record = { ...(await load(code)), presence: {} };
+    actorId = authenticate(record.state, identity);
+    if (!actorId) throw new RoomError("Join the room first.", 401);
+    // Check the action against the room as we just read it, for friendly errors.
+    preview = applyAction(record.state, actorId, action);
+  }
   const op = hotOp(record.state, actorId, action, preview);
   let state: AnyState;
   let version: number;
@@ -176,8 +205,10 @@ export async function actInRoom(code: string, identity: Identity | null, action:
       applyAction(s, actorId, action, { newId: () => card?.id ?? newId(), now: Date.now() }),
     ));
   } else {
-    ({ state, version } = await mutate(code, (s) => applyAction(s, actorId, action), record));
+    const actor = actorId;
+    ({ state, version } = await mutate(code, (s) => applyAction(s, actor, action), record));
     presence = await getStore().presence(code);
+    remember(code, { version, kind: state.kind, state, presence });
   }
   return { version, room: view(state, actorId in state.participants ? actorId : null, presence) };
 }
@@ -189,10 +220,19 @@ export async function actInRoom(code: string, identity: Identity | null, action:
  */
 export async function readRoom(code: string, identity: Identity | null, since: number | null, heartbeat: boolean) {
   const viewer = identity ? { id: identity.participantId, hash: hashSecret(identity.secret) } : null;
+  // Most polls: answer from this server's one-second snapshot of the room,
+  // and send any heartbeat along with others in a batch.
+  const recent = await loadRecent(code, since ?? 0);
+  const viewerId = authenticate(recent.state, identity);
+  if ((since === null || recent.version >= since) && (!heartbeat || viewerId)) {
+    if (heartbeat && viewer) queueHeartbeat({ code, id: viewer.id, hash: viewer.hash });
+    if (recent.version === since) return null;
+    return { version: recent.version, room: view(recent.state, viewerId, recent.presence) };
+  }
   const result = await getStore().read(code, since, viewer, heartbeat);
   if (!result || (result.kind !== "poker" && result.kind !== "retro")) throw new RoomError(NOT_FOUND, 404);
   if (result.state === null) return null;
   const state = result.state as AnyState;
-  const viewerId = authenticate(state, identity);
-  return { version: result.version, room: view(state, viewerId, result.presence ?? {}) };
+  remember(code, { version: result.version, kind: result.kind, state, presence: result.presence ?? {} });
+  return { version: result.version, room: view(state, authenticate(state, identity), result.presence ?? {}) };
 }
