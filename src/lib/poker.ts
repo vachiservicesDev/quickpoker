@@ -15,7 +15,7 @@ export const LIMITS = {
   roomName: 80,
   storyTitle: 200,
   stories: 200,
-  participants: 50,
+  participants: 100,
   customCards: 20,
   cardLabel: 6,
 };

@@ -50,9 +50,9 @@ export const PHASES: { id: Phase; label: string }[] = [
 export const RETRO_LIMITS = {
   name: 40,
   roomName: 80,
-  participants: 50,
+  participants: 100,
   cardText: 300,
-  cards: 400,
+  cards: 600,
   cardsPerPerson: 60,
   actionText: 200,
   actions: 60,

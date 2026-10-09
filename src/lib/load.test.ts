@@ -128,14 +128,28 @@ describe("load", () => {
     expect(results.every((r) => r.cards === 40 && r.votes === 30)).toBe(true);
   });
 
-  it("handles one 50-person retro where everyone clicks at once", { timeout: 120_000 }, async () => {
+  it("handles one 100-person retro where everyone clicks at once", { timeout: 120_000 }, async () => {
     const latencies: number[] = [];
     const failures: string[] = [];
-    const r = await retroTeam(50, 2, latencies, failures);
+    const r = await retroTeam(100, 2, latencies, failures);
     console.log(
-      `big retro: 50 people, ${latencies.length} writes; p50 ${Math.round(pct(latencies, 50))} ms, p95 ${Math.round(pct(latencies, 95))} ms, ` +
+      `big retro: 100 people, ${latencies.length} writes; p50 ${Math.round(pct(latencies, 50))} ms, p95 ${Math.round(pct(latencies, 95))} ms, ` +
         `max ${Math.round(Math.max(...latencies))} ms; failures ${failures.length} ${[...new Set(failures)].join(" | ")}; cards ${r.cards}, votes ${r.votes}`,
     );
     expect(failures).toEqual([]);
+    expect(r).toEqual({ cards: 200, votes: 300 });
+  });
+
+  it("handles one 100-person planning poker room where everyone votes at once", { timeout: 120_000 }, async () => {
+    const latencies: number[] = [];
+    const failures: string[] = [];
+    const t = performance.now();
+    const estimated = await pokerTeam(100, latencies, failures);
+    console.log(
+      `big poker: 100 people, ${latencies.length} writes in ${Math.round(performance.now() - t)} ms; p50 ${Math.round(pct(latencies, 50))} ms, ` +
+        `p95 ${Math.round(pct(latencies, 95))} ms; failures ${failures.length} ${[...new Set(failures)].join(" | ")}`,
+    );
+    expect(failures).toEqual([]);
+    expect(estimated).toBe(3);
   });
 });

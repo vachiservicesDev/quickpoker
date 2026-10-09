@@ -24,7 +24,8 @@ Free planning poker and retrospectives by Vachi Services. No sign-up, and built 
 | --- | --- | --- | --- |
 | 100 poker teams of 10, everyone voting in the same instant | 4,600 | ~0.3 s | 0 |
 | 100 retro teams of 10, everyone adding 4 cards and 3 votes in the same instant | 7,900 | ~2 s | 0 |
-| One 50-person retro, everyone clicking at once | 299 | ~3.4 s | 0 |
+| One 100-person retro, everyone adding 2 cards and 3 votes in the same instant | 599 | ~7 s | 0 |
+| One 100-person poker room, everyone voting in the same instant, 3 rounds | 406 | ~3.5 s | 0 |
 
 In a live test on the free plans (100 poker rooms, 1,000 people), every join and all 1,000 simultaneous votes were recorded. Postgres answered each call in a few milliseconds, but Supabase Free's API layer queued requests beyond roughly 100 a second, which is why the server shares reads and batches heartbeats.
 
