@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { StartRoom } from "@/components/StartRoom";
@@ -21,6 +22,13 @@ const networkFacts = [
   { title: "Plain HTTPS fallback", body: "If live updates are blocked, the room checks for changes every few seconds instead." },
   { title: "Gone in 24 hours", body: "Rooms, votes and stories are deleted a day after the room was last used." },
   { title: "No accounts", body: "We store only the display name you type, and only for that room." },
+];
+
+const moreLinks = [
+  { href: "/toolkit", title: "Free facilitator toolkit", body: "Retro formats, icebreakers and an estimation cheat sheet you can print." },
+  { href: "/quiz", title: "Practice quizzes", body: "Test your Scrum and estimation knowledge, with an explanation for every answer." },
+  { href: "/services", title: "Coaching and facilitation", body: "Get help running retros, PI planning and team workshops." },
+  { href: "/newsletter", title: "Newsletter", body: "Agile tips, new templates and career guides, about twice a month." },
 ];
 
 export default function Home() {
@@ -95,6 +103,24 @@ export default function Home() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+        <section aria-labelledby="more-h" className="border-t border-line bg-canvas">
+          <div className="container-page flex flex-col gap-8 py-20 md:py-24">
+            <div className="flex max-w-3xl flex-col gap-3">
+              <p className="t-eyebrow">More for your team</p>
+              <h2 id="more-h" className="t-h2">Run better meetings, not just faster ones.</h2>
+            </div>
+            <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              {moreLinks.map((m) => (
+                <li key={m.href}>
+                  <Link href={m.href} className="card flex h-full flex-col gap-2 p-6 hover:border-navy-600">
+                    <h3 className="text-lg font-semibold">{m.title}</h3>
+                    <p className="text-[15px] text-ink-2">{m.body}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
       </main>

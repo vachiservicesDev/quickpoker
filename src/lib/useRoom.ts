@@ -223,5 +223,5 @@ export function useRoom<V extends RoomViewBase, A extends { type: string } = { t
     [code, headers, apply],
   );
 
-  return { status, room, error, setError, mode, join, act };
+  return { status, room, error, setError, mode, join, act, headers };
 }

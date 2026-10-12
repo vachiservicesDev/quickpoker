@@ -9,9 +9,10 @@ export function SiteHeader() {
         <nav aria-label="Main" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px] font-medium text-ink-2">
           <Link href="/#how-it-works" className="hover:text-navy-700">How it works</Link>
           <Link href="/#retros" className="hover:text-navy-700">Retros</Link>
-          <Link href="/#company-networks" className="hover:text-navy-700">Company networks</Link>
-          <Link href="/about" className="hover:text-navy-700">About</Link>
-          <Link href="/feedback" className="hover:text-navy-700">Feedback</Link>
+          <Link href="/toolkit" className="hover:text-navy-700">Toolkit</Link>
+          <Link href="/quiz" className="hover:text-navy-700">Quizzes</Link>
+          <Link href="/services" className="hover:text-navy-700">Services</Link>
+          <Link href="/pricing" className="hover:text-navy-700">Pricing</Link>
         </nav>
         <Link href="/#start" className="btn btn-primary">Start a free room</Link>
       </div>

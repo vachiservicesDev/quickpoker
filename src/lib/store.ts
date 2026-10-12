@@ -35,6 +35,19 @@ export interface Beat {
   hash: string;
 }
 
+export type LeadKind = "newsletter" | "services" | "waitlist" | "toolkit" | "board";
+export interface Lead {
+  kind: LeadKind;
+  email: string;
+  name: string | null;
+  company: string | null;
+  interest: string | null;
+  message: string | null;
+  source: string | null;
+  newsletter: boolean;
+  token: string;
+}
+
 export type UpdateResult = { ok: true; version: number } | { ok: false; current: RoomRecord | null };
 
 export interface RoomStore {
@@ -62,6 +75,11 @@ export interface RoomStore {
   heartbeats(beats: Beat[]): Promise<void>;
   presence(code: string): Promise<Record<string, number>>;
   saveFeedback(entry: { message: string; contact: string | null; page: string | null }): Promise<void>;
+  saveLead(lead: Lead): Promise<void>;
+  /** Marks a newsletter sign-up as confirmed. False if the link is unknown. */
+  confirmLead(token: string): Promise<boolean>;
+  /** Stops all marketing email to the address behind this token. */
+  unsubscribeLead(token: string): Promise<boolean>;
 }
 
 class SupabaseStore implements RoomStore {
@@ -137,6 +155,33 @@ class SupabaseStore implements RoomStore {
     const { error } = await this.db.from("feedback").insert(entry);
     if (error) throw error;
   }
+
+  async saveLead(lead: Lead) {
+    const { error } = await this.db.from("leads").insert(lead);
+    if (error) throw error;
+  }
+
+  async confirmLead(token: string) {
+    const { data, error } = await this.db
+      .from("leads")
+      .update({ confirmed_at: new Date().toISOString(), unsubscribed_at: null })
+      .eq("token", token)
+      .select("id");
+    if (error) throw error;
+    return (data ?? []).length > 0;
+  }
+
+  async unsubscribeLead(token: string) {
+    const { data: row, error } = await this.db.from("leads").select("email").eq("token", token).maybeSingle();
+    if (error) throw error;
+    if (!row) return false;
+    const { error: err2 } = await this.db
+      .from("leads")
+      .update({ unsubscribed_at: new Date().toISOString(), newsletter: false })
+      .ilike("email", row.email);
+    if (err2) throw err2;
+    return true;
+  }
 }
 
 // For local development and tests only: state lives in this process, so it
@@ -209,6 +254,29 @@ class MemoryStore implements RoomStore {
 
   async saveFeedback(entry: unknown) {
     this.feedback.push(entry);
+  }
+
+  leads: (Lead & { confirmedAt: number | null; unsubscribedAt: number | null })[] = [];
+
+  async saveLead(lead: Lead) {
+    this.leads.push({ ...lead, confirmedAt: null, unsubscribedAt: null });
+  }
+
+  async confirmLead(token: string) {
+    const lead = this.leads.find((l) => l.token === token);
+    if (!lead) return false;
+    lead.confirmedAt = Date.now();
+    lead.unsubscribedAt = null;
+    return true;
+  }
+
+  async unsubscribeLead(token: string) {
+    const lead = this.leads.find((l) => l.token === token);
+    if (!lead) return false;
+    for (const l of this.leads) {
+      if (l.email.toLowerCase() === lead.email.toLowerCase()) Object.assign(l, { unsubscribedAt: Date.now(), newsletter: false });
+    }
+    return true;
   }
 }
 

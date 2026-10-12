@@ -7,10 +7,11 @@ import { useRoom } from "@/lib/useRoom";
 import { ErrorBanner, JoinForm, MissingRoom, Shell } from "./RoomChrome";
 
 type Act = (action: RetroAction) => Promise<boolean>;
+type Headers = () => HeadersInit;
 const TITLE = "Sprint retrospective";
 
 export function RetroRoom({ code }: { code: string }) {
-  const { status, room, error, setError, mode, join, act } = useRoom<RetroView, RetroAction>(code);
+  const { status, room, error, setError, mode, join, act, headers } = useRoom<RetroView, RetroAction>(code);
   const router = useRouter();
   const wrongKind = (room?.kind as string | undefined) === "poker";
   useEffect(() => {
@@ -35,7 +36,7 @@ export function RetroRoom({ code }: { code: string }) {
       <ErrorBanner error={error} onDismiss={() => setError(null)} />
       <PrintHeader room={room} />
       <div className="container-page flex flex-col gap-6 py-8 print:py-0">
-        <Toolbar room={room} act={act} />
+        <Toolbar code={code} room={room} act={act} headers={headers} />
         <Board room={room} act={act} />
         <div className="flex flex-wrap items-start gap-6">
           <Actions room={room} act={act} />
@@ -58,7 +59,7 @@ function PrintHeader({ room }: { room: RetroView }) {
   );
 }
 
-function Toolbar({ room, act }: { room: RetroView; act: Act }) {
+function Toolbar({ code, room, act, headers }: { code: string; room: RetroView; act: Act; headers: Headers }) {
   const me = room.me!;
   const fac = me.isFacilitator;
   const idx = PHASES.findIndex((p) => p.id === room.phase);
@@ -112,7 +113,7 @@ function Toolbar({ room, act }: { room: RetroView; act: Act }) {
         )}
       </div>
       <Timer room={room} act={act} />
-      {fac && room.phase !== "write" && <Export room={room} />}
+      {fac && room.phase !== "write" && <Export code={code} room={room} headers={headers} act={act} />}
     </section>
   );
 }
@@ -199,8 +200,11 @@ function Timer({ room, act }: { room: RetroView; act: Act }) {
   );
 }
 
-function Export({ room }: { room: RetroView }) {
+function Export({ code, room, headers, act }: { code: string; room: RetroView; headers: Headers; act: Act }) {
   const [note, setNote] = useState<string | null>(null);
+  const [to, setTo] = useState("");
+  const [newsletter, setNewsletter] = useState(false);
+  const [sending, setSending] = useState(false);
 
   function flash(text: string) {
     setNote(text);
@@ -213,6 +217,26 @@ function Export({ room }: { room: RetroView }) {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  // Sends the summary from QuickPoker. Until email is set up on the server,
+  // falls back to opening the facilitator's own mail app.
+  async function emailMe(e: { preventDefault(): void }) {
+    e.preventDefault();
+    setSending(true);
+    const res = await fetch(`/api/rooms/${code}/email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers() },
+      body: JSON.stringify({ email: to, newsletter }),
+    }).catch(() => null);
+    setSending(false);
+    if (res?.ok) {
+      flash(`Sent to ${to}.${newsletter ? " Click the link in it to confirm the newsletter." : ""}`);
+    } else if (res?.status === 503) {
+      await email();
+    } else {
+      flash((await res?.json().catch(() => null))?.error ?? "Couldn't send. Try Copy summary instead.");
     }
   }
 
@@ -249,7 +273,7 @@ function Export({ room }: { room: RetroView }) {
       <span className="t-label">Save the board</span>
       <div className="flex flex-wrap gap-2">
         <button className="btn btn-primary" onClick={() => window.print()}>Print or save PDF</button>
-        <button className="btn btn-secondary" onClick={email}>Email summary</button>
+        <button className="btn btn-secondary" onClick={email}>Open in my mail app</button>
         <button className="btn btn-ghost" onClick={csv}>Download CSV</button>
         <button
           className="btn btn-ghost"
@@ -258,7 +282,99 @@ function Export({ room }: { room: RetroView }) {
           Copy summary
         </button>
       </div>
+      <form className="flex flex-col gap-2 print:hidden" onSubmit={emailMe}>
+        <div className="flex flex-wrap gap-2">
+          <label htmlFor="email-board" className="sr-only">Email address</label>
+          <input id="email-board" type="email" className="field h-11 max-w-xs flex-1" placeholder="you@company.com" value={to} onChange={(e) => setTo(e.target.value)} required autoComplete="email" />
+          <button type="submit" className="btn btn-secondary" disabled={sending}>{sending ? "Sending…" : "Email me this board"}</button>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-ink-2">
+          <input type="checkbox" className="h-4 w-4" checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} />
+          Also send me the QuickPoker newsletter (retro ideas and templates)
+        </label>
+      </form>
       <p className="min-h-5 text-sm text-ink-2" aria-live="polite">{note ?? "The board is deleted 24 hours after its last use, so save it before then."}</p>
+      {AI_ON && <AiSummaryPanel code={code} room={room} headers={headers} act={act} />}
+    </div>
+  );
+}
+
+const AI_ON = process.env.NEXT_PUBLIC_AI_SUMMARY === "1";
+
+interface AiSummary {
+  overview: string;
+  themes: { title: string; summary: string; cards: number }[];
+  actions: { text: string; why: string }[];
+}
+
+function AiSummaryPanel({ code, room, headers, act }: { code: string; room: RetroView; headers: Headers; act: Act }) {
+  const [summary, setSummary] = useState<AiSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<string[]>([]);
+
+  async function run() {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/rooms/${code}/ai-summary`, { method: "POST", headers: headers() }).catch(() => null);
+    setBusy(false);
+    if (res?.ok) setSummary(await res.json());
+    else setError((await res?.json().catch(() => null))?.error ?? "Couldn't reach the AI. Try again.");
+  }
+
+  async function add(text: string) {
+    if (await act({ type: "addAction", text: text.slice(0, RETRO_LIMITS.actionText) })) setAdded((a) => [...a, text]);
+  }
+
+  return (
+    <div className="card mt-2 flex flex-col gap-3 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="t-label">AI summary</span>
+        <button className="btn btn-secondary print:hidden" onClick={run} disabled={busy}>
+          {busy ? "Reading the board…" : summary ? "Summarize again" : "Summarize with AI"}
+        </button>
+      </div>
+      {!summary && !error && (
+        <p className="text-sm text-ink-2">Groups the cards into themes and suggests up to three action items. The card text is sent to Anthropic to create it.</p>
+      )}
+      {error && <p className="text-sm text-danger-700" role="alert">{error}</p>}
+      {summary && (
+        <div className="flex flex-col gap-3" aria-live="polite">
+          <p>{summary.overview}</p>
+          {summary.themes.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {summary.themes.map((t) => (
+                <li key={t.title}>
+                  <span className="font-semibold">{t.title}</span>
+                  <span className="text-ink-2"> ({t.cards} {t.cards === 1 ? "card" : "cards"}): </span>
+                  {t.summary}
+                </li>
+              ))}
+            </ul>
+          )}
+          {summary.actions.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="t-label">Suggested action items</span>
+              {summary.actions.map((a) => (
+                <div key={a.text} className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">{a.text}</div>
+                    <div className="text-sm text-ink-2">{a.why}</div>
+                  </div>
+                  <button
+                    className="btn btn-ghost print:hidden"
+                    disabled={added.includes(a.text) || room.actions.some((x) => x.text === a.text.slice(0, RETRO_LIMITS.actionText))}
+                    onClick={() => add(a.text)}
+                  >
+                    {added.includes(a.text) ? "Added" : "Add to action items"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-ink-2">Written by AI from the cards on this board. Check it before you share it.</p>
+        </div>
+      )}
     </div>
   );
 }

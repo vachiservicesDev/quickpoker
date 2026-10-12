@@ -31,6 +31,15 @@ In a live test on the free plans (100 poker rooms, 1,000 people), every join and
 
 Hosting is the limit, not the code. With 1,000 people online, polling costs roughly 50 requests a second when Realtime connects and 300 to 500 when it's blocked. Supabase Free allows 200 Realtime connections (Pro allows 500), and Vercel Hobby is for non-commercial use with monthly caps. Plan on Vercel Pro and Supabase Pro before regular traffic at that size.
 
+## Growth features
+
+These all work without accounts. Each one turns on with an environment variable (see `.env.example`).
+
+- **Lead capture** (`leads` table, `/api/leads`): the newsletter (double opt-in, with one-click unsubscribe), service inquiries on `/services`, and the Team plan waitlist on `/pricing`. New leads are emailed to `FEEDBACK_TO_EMAIL`. Unconfirmed newsletter sign-ups are deleted after 30 days.
+- **Email me this board**: the retro facilitator gets the summary by email. This needs `EMAIL_FROM` on a domain verified in Resend. Until then, the app opens the facilitator's mail app instead.
+- **Toolkit and quizzes** (`/toolkit`, `/quiz`): free printable guides and practice quizzes. The Pro Pack button uses `NEXT_PUBLIC_TOOLKIT_PAY_URL` (a Stripe Payment Link) when it's set. Otherwise it collects a waitlist.
+- **AI retro summary**: themes and suggested action items from Claude. To turn it on, set `ANTHROPIC_API_KEY` and `NEXT_PUBLIC_AI_SUMMARY=1`. It's limited to 3 runs a minute per facilitator.
+
 ## Run locally
 
 ```bash
