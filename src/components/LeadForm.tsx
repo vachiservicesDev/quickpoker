@@ -80,7 +80,7 @@ export function LeadForm({ kind, source, interests, defaultInterest, askMessage 
       )}
       <label className="flex items-start gap-2 text-sm text-ink-2">
         <input type="checkbox" className="mt-1 h-4 w-4" checked={form.newsletter} onChange={(e) => setForm({ ...form, newsletter: e.target.checked })} />
-        Also send me the QuickPoker newsletter (agile tips, templates, career guides). Unsubscribe anytime.
+        Also send me the QuickPoker newsletter (Scrum facilitation tips, retro formats, certification guides). Unsubscribe anytime.
       </label>
       <button type="submit" className="btn btn-primary btn-lg self-start" disabled={state === "sending"}>
         {state === "sending" ? "Sending…" : submitLabel}

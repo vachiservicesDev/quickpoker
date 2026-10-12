@@ -7,14 +7,14 @@ import { Status } from "./Status";
 
 export const metadata: Metadata = {
   title: "Newsletter",
-  description: "Agile tips, new retro templates, certification and career guides, and QuickPoker updates, about twice a month.",
+  description: "Scrum facilitation techniques, new retro formats, certification guides and QuickPoker updates, about twice a month.",
 };
 
 const TOPICS = [
-  "Retro formats and facilitation tips you can use in your next meeting",
-  "New QuickPoker features and templates, first",
-  "Certification study guides and career paths for agile and Salesforce professionals",
-  "Release highlights explained in plain language",
+  "A retro format or facilitation technique you can use in your next Sprint",
+  "Common Scrum anti-patterns and how experienced teams fix them",
+  "Study guides for Scrum Master and Product Owner certifications",
+  "New QuickPoker features and templates, before anyone else",
 ];
 
 export default function Newsletter() {
@@ -27,7 +27,7 @@ export default function Newsletter() {
             <Status />
           </Suspense>
           <p className="t-eyebrow">Newsletter</p>
-          <h1 className="t-h2">Better sprints, in your inbox.</h1>
+          <h1 className="t-h2">Scrum field notes, in your inbox.</h1>
           <p className="t-lead">A short email about twice a month. No spam, and you can unsubscribe with one click.</p>
           <ul className="flex list-disc flex-col gap-2 pl-5 text-ink-2">
             {TOPICS.map((t) => <li key={t}>{t}</li>)}

@@ -21,7 +21,7 @@ const PLANS = [
     name: "Team",
     price: "$12",
     note: "Per team, per month. Coming soon",
-    features: ["Everything in Free", "Boards and estimates saved across sprints", "Import stories from Jira or Azure DevOps", "AI retro summaries with themes and actions", "Your team's logo and Excel export"],
+    features: ["Everything in Free", "Boards and estimates saved across Sprints", "Import stories from Jira or Azure DevOps", "AI retro summaries with themes and actions", "Your team's logo and Excel export"],
     cta: { label: "Join the waitlist", href: "#waitlist" },
   },
   {
@@ -42,7 +42,7 @@ export default function Pricing() {
           <div className="flex max-w-3xl flex-col gap-5">
             <p className="t-eyebrow">Pricing</p>
             <h1 className="t-h2">Free for every team. More when you need it.</h1>
-            <p className="t-lead">Everything on QuickPoker today stays free. The Team plan adds history and integrations for teams that want them.</p>
+            <p className="t-lead">Everything on QuickPoker today stays free. The Team plan adds Sprint-over-Sprint history and backlog tool integrations for teams that want them.</p>
           </div>
           <ul className="grid gap-5 lg:grid-cols-3">
             {PLANS.map((p) => (

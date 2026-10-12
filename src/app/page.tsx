@@ -4,31 +4,31 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { StartRoom } from "@/components/StartRoom";
 
 const steps = [
-  { n: "01", title: "Create a room", body: "Type your name and pick a deck. No account, no email." },
-  { n: "02", title: "Share the link", body: "Teammates open it in any browser, on a laptop or a phone." },
-  { n: "03", title: "Add your stories", body: "Type them in or paste a list, one story per line." },
-  { n: "04", title: "Vote and reveal", body: "Everyone picks a card, the facilitator reveals, and the estimate is saved to the story." },
+  { n: "01", title: "Open a room", body: "Enter your name and pick a deck: Fibonacci, T-shirt sizes or your own. No account, no email." },
+  { n: "02", title: "Share the link", body: "Drop it in the meeting chat. Developers join from any browser, on a laptop or a phone." },
+  { n: "03", title: "Load the backlog items", body: "Paste the items you refined, one per line, in the order the Product Owner wants them." },
+  { n: "04", title: "Vote, reveal, talk", body: "Everyone votes in private and the cards flip together. Hear the highs and lows, re-vote, and save the estimate." },
 ];
 
 const retroFacts = [
-  { title: "Four formats", body: "Went well, To improve, Try next. Start, Stop, Continue. Mad, Sad, Glad. Or the 4 Ls." },
-  { title: "Anonymous cards", body: "Cards don't show who wrote them, and stay hidden until the facilitator reveals them." },
-  { title: "Dot voting and a timer", body: "Everyone gets a few votes, the board sorts itself, and a shared timer keeps it moving." },
-  { title: "Print, email or download", body: "Save the board as a PDF, email the summary to your team, or download it as a spreadsheet." },
+  { title: "Proven formats", body: "Went well, To improve, Try next. Start, Stop, Continue. Mad, Sad, Glad. The 4 Ls. Change it up when the team goes quiet." },
+  { title: "Safe to be honest", body: "Cards are anonymous and stay hidden until the facilitator reveals them, so the loudest voice doesn't set the agenda." },
+  { title: "Dot voting and a timer", body: "The team picks what to discuss, the board sorts itself, and a shared timer keeps the event inside its time-box." },
+  { title: "Leave with owned actions", body: "Capture improvements with an owner, then print, email or export them before the board is deleted." },
 ];
 
 const networkFacts = [
   { title: "One address", body: "Pages and room updates come from the same website, so there is nothing extra for IT to allow." },
   { title: "Plain HTTPS fallback", body: "If live updates are blocked, the room checks for changes every few seconds instead." },
   { title: "Gone in 24 hours", body: "Rooms, votes and stories are deleted a day after the room was last used." },
-  { title: "No accounts", body: "We store only the display name you type, and only for that room." },
+  { title: "No accounts", body: "We store only the display name you type, and only for that room. Nothing to approve with procurement." },
 ];
 
 const moreLinks = [
-  { href: "/toolkit", title: "Free facilitator toolkit", body: "Retro formats, icebreakers and an estimation cheat sheet you can print." },
-  { href: "/quiz", title: "Practice quizzes", body: "Test your Scrum and estimation knowledge, with an explanation for every answer." },
-  { href: "/services", title: "Coaching and facilitation", body: "Get help running retros, PI planning and team workshops." },
-  { href: "/newsletter", title: "Newsletter", body: "Agile tips, new templates and career guides, about twice a month." },
+  { href: "/toolkit", title: "Scrum Master toolkit", body: "Retro formats, icebreakers, an estimation cheat sheet and Definition of Done templates, free to print." },
+  { href: "/quiz", title: "Scrum practice quizzes", body: "Check your grasp of the Scrum Guide and estimation, with the reasoning behind every answer." },
+  { href: "/services", title: "Coaching and facilitation", body: "An experienced hand for your Sprint events, team health checks and Scrum workshops." },
+  { href: "/newsletter", title: "Newsletter", body: "Facilitation techniques and Scrum field notes, about twice a month." },
 ];
 
 export default function Home() {
@@ -39,11 +39,11 @@ export default function Home() {
         <section className="grid-bg border-b border-line bg-subtle">
           <div className="container-page flex flex-col gap-12 py-16 md:py-24">
             <div className="flex max-w-3xl flex-col">
-              <p className="t-eyebrow">Free planning poker and retros, no sign-up</p>
-              <h1 className="t-display mt-4">Estimate together, from any network.</h1>
+              <p className="t-eyebrow">Planning poker and retrospectives for Scrum teams</p>
+              <h1 className="t-display mt-4">Better Sprint events, from any network.</h1>
               <p className="t-lead mt-6 max-w-[42rem]">
-                Estimate stories with planning poker or run your sprint retro, then share the link. QuickPoker runs as an
-                ordinary website, so it opens behind company firewalls and VPNs. Rooms are deleted 24 hours after their last use.
+                Size your Product Backlog with planning poker and run your Sprint Retrospective in one free tool. No sign-up,
+                and it opens behind company firewalls and VPNs. Rooms are deleted 24 hours after their last use.
               </p>
             </div>
             <StartRoom />
@@ -54,7 +54,7 @@ export default function Home() {
           <div className="container-page flex flex-col gap-12 py-20 md:py-28">
             <div className="flex flex-col gap-3">
               <p className="t-eyebrow">How it works</p>
-              <h2 className="t-h2">From link to estimate in four steps.</h2>
+              <h2 className="t-h2">Estimate the way good Scrum teams do.</h2>
             </div>
             <ol className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
               {steps.map((s) => (
@@ -72,8 +72,8 @@ export default function Home() {
           <div className="container-page flex flex-wrap gap-12 py-20 md:py-28">
             <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-3">
               <p className="t-eyebrow">Retrospectives</p>
-              <h2 className="t-h2">Run the retro in the same place.</h2>
-              <p className="t-lead mt-2">Pick a format, set a timer, and let everyone write privately before the cards are revealed.</p>
+              <h2 className="t-h2">Retros that end in real improvements.</h2>
+              <p className="t-lead mt-2">The Sprint Retrospective is where the team gets better. Give everyone a voice, focus on what matters most, and leave with one or two actions people actually own.</p>
             </div>
             <ul className="grid min-w-0 flex-[1_1_520px] gap-8 sm:grid-cols-2">
               {retroFacts.map((f) => (
@@ -109,7 +109,7 @@ export default function Home() {
           <div className="container-page flex flex-col gap-8 py-20 md:py-24">
             <div className="flex max-w-3xl flex-col gap-3">
               <p className="t-eyebrow">More for your team</p>
-              <h2 id="more-h" className="t-h2">Run better meetings, not just faster ones.</h2>
+              <h2 id="more-h" className="t-h2">Grow as a Scrum team, not just a faster one.</h2>
             </div>
             <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
               {moreLinks.map((m) => (

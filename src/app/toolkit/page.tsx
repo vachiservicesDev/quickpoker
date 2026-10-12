@@ -6,8 +6,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { PRO_PACK, RESOURCES } from "@/lib/toolkit";
 
 export const metadata: Metadata = {
-  title: "Free facilitator toolkit: retro formats, icebreakers, estimation",
-  description: "Free printable guides for agile facilitators: six retro formats, 20 icebreakers, a story point cheat sheet, and Definition of Ready and Done checklists.",
+  title: "Free Scrum Master toolkit: retro formats, icebreakers, estimation",
+  description: "Free printable guides for Scrum Masters and facilitators: six retro formats, 20 icebreakers, a story point cheat sheet, and Definition of Ready and Done templates.",
 };
 
 // Set NEXT_PUBLIC_TOOLKIT_PAY_URL to a Stripe Payment Link to sell the Pro Pack.
@@ -20,9 +20,9 @@ export default function Toolkit() {
       <main id="main" className="flex-1 bg-canvas">
         <div className="container-page flex flex-col gap-12 py-16 md:py-24">
           <div className="flex max-w-3xl flex-col gap-5">
-            <p className="t-eyebrow">Facilitator toolkit</p>
-            <h1 className="t-h2">Everything you need to run a great meeting.</h1>
-            <p className="t-lead">Free guides you can read, print or save as PDF. Bring them to your next retro or planning session.</p>
+            <p className="t-eyebrow">Scrum Master toolkit</p>
+            <h1 className="t-h2">The guides we use to run our own Sprint events.</h1>
+            <p className="t-lead">Free to read, print or save as PDF. Take them into your next Sprint Planning, refinement or Retrospective.</p>
           </div>
           <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {RESOURCES.map((r) => (

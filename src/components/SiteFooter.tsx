@@ -6,7 +6,7 @@ export function SiteFooter() {
     <footer className="border-t border-line bg-subtle">
       <div className="container-page flex flex-wrap justify-between gap-6 py-16 text-sm text-ink-2">
         <div className="flex max-w-[36rem] flex-col gap-4">
-          <p>QuickPoker is free planning poker and retros by Vachi Services LLC. Rooms are deleted 24 hours after their last use.</p>
+          <p>QuickPoker is free planning poker and Sprint Retrospective boards for Scrum teams, by Vachi Services LLC. Rooms are deleted 24 hours after their last use.</p>
           <NewsletterForm source="footer" compact />
           <address className="not-italic leading-relaxed">
             Vachi Services LLC

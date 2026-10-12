@@ -17,8 +17,8 @@ export default function Quizzes() {
         <div className="container-page flex flex-col gap-10 py-16 md:py-24">
           <div className="flex max-w-3xl flex-col gap-5">
             <p className="t-eyebrow">Practice quizzes</p>
-            <h1 className="t-h2">Check what you know, free.</h1>
-            <p className="t-lead">Short quizzes with an explanation for every answer. Good practice before a certification exam or a new role.</p>
+            <h1 className="t-h2">How well do you know Scrum?</h1>
+            <p className="t-lead">Short quizzes based on the Scrum Guide, with the reasoning behind every answer. Good practice before a certification exam, an interview or your first Sprint as a Scrum Master.</p>
           </div>
           <ul className="grid gap-5 md:grid-cols-2">
             {QUIZZES.map((q) => (

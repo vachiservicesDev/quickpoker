@@ -65,7 +65,7 @@ export function sendConfirmation(email: string, token: string): Promise<boolean>
     email,
     "Confirm your QuickPoker newsletter subscription",
     [
-      "Thanks for signing up for the QuickPoker newsletter: agile tips, new templates, certification and career guides, and product updates.",
+      "Thanks for signing up for the QuickPoker newsletter: Scrum facilitation techniques, new retro formats, certification guides and product updates.",
       "",
       "Confirm your subscription here:",
       `${siteUrl()}/api/leads/confirm?token=${token}`,

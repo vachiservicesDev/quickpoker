@@ -5,34 +5,34 @@ import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "Agile coaching, facilitation and workshops",
-  description: "Agile coaching, retro and PI planning facilitation, team workshops, health checks and Salesforce career coaching from Vachi Services.",
+  description: "Scrum coaching, Sprint event facilitation, team workshops, health checks and Scrum certification coaching from Vachi Services.",
 };
 
 const SERVICES = [
   {
-    name: "Agile coaching",
+    name: "Scrum coaching",
     price: "From $150 per session",
-    text: "One-to-one or team coaching for Scrum Masters, Product Owners and new agile teams. Practical help with your real backlog and ceremonies.",
+    text: "One-to-one or team coaching for Scrum Masters, Product Owners and new Scrum teams. We work on your real Product Backlog and your real Sprint events, not slides.",
   },
   {
-    name: "Done-for-you facilitation",
+    name: "Event facilitation",
     price: "From $300 per session",
-    text: "We run your retrospective, sprint planning or PI planning, so everyone on your team can take part. You get the board and action items afterwards.",
+    text: "A neutral facilitator for your Sprint Retrospective, Sprint Planning, refinement or PI Planning, so your Scrum Master can take part too. You keep the board and the action items.",
   },
   {
     name: "Live workshops",
     price: "$49 per seat, or private team sessions",
-    text: "Two-hour online workshops: Run better retros, Estimation that works, and Writing stories your team can deliver.",
+    text: "Two-hour online workshops: Retros that change something, Estimation without the arguments, and Backlog items your Developers can finish in a Sprint.",
   },
   {
     name: "Team health check",
     price: "From $500 per team",
-    text: "A structured survey and facilitated review of how your team works, with a short report and three priorities to improve.",
+    text: "A structured survey and facilitated review of how your Scrum Team works: goals, flow, quality and collaboration. You get a short report and three priorities to improve.",
   },
   {
-    name: "Salesforce career coaching",
+    name: "Scrum certification and career coaching",
     price: "From $99 per session",
-    text: "Certification planning, career path advice and interview preparation for Salesforce admins, developers and consultants.",
+    text: "Study plans for Scrum Master and Product Owner certifications, mock interviews, and career advice for people moving into Scrum roles.",
   },
   {
     name: "White-label licence",
@@ -49,8 +49,8 @@ export default function Services() {
         <div className="container-page flex flex-col gap-12 py-16 md:py-24">
           <div className="flex max-w-3xl flex-col gap-5">
             <p className="t-eyebrow">Services</p>
-            <h1 className="t-h2">Help from people who run these meetings every week.</h1>
-            <p className="t-lead">QuickPoker is free. When your team wants more, Vachi Services offers coaching, facilitation and training.</p>
+            <h1 className="t-h2">Help from people who facilitate Scrum events every week.</h1>
+            <p className="t-lead">QuickPoker stays free. When your team wants an experienced hand, Vachi Services offers Scrum coaching, facilitation and training.</p>
           </div>
           <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {SERVICES.map((s) => (

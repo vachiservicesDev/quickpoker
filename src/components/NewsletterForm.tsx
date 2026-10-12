@@ -40,7 +40,7 @@ export function NewsletterForm({ source, compact = false }: { source: string; co
       }}
     >
       <label htmlFor={`nl-${source}`} className={compact ? "text-sm font-medium" : "font-medium"}>
-        Get agile tips, new templates and career guides by email
+        Get Scrum facilitation tips and new retro formats by email
       </label>
       <div className="flex flex-wrap gap-2">
         <input

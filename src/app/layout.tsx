@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     template: "%s | QuickPoker",
   },
   description:
-    "Free planning poker for agile teams. Create a room, share the link and estimate stories together. No sign-up, works behind company firewalls and VPNs.",
+    "Free planning poker and Sprint Retrospective boards for Scrum teams. Create a room, share the link and estimate together. No sign-up, works behind company firewalls and VPNs.",
   keywords: ["planning poker", "free planning poker", "scrum poker", "pointing poker", "agile estimation", "story points", "retrospective", "retro board", "sprint retrospective", "scrum retro"],
   openGraph: {
     type: "website",

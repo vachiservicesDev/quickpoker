@@ -66,7 +66,7 @@ function Toolbar({ code, room, act, headers }: { code: string; room: RetroView; 
   const hint: Record<Phase, string> = {
     write: "Add cards to any column. Other people's cards stay hidden until the facilitator moves on.",
     vote: `Vote on the cards that matter most. You have ${me.votesLeft} of ${room.votesPerPerson} votes left.`,
-    discuss: "Cards are sorted by votes. Talk through the top ones and capture action items below.",
+    discuss: "Cards are sorted by votes. Talk through the top ones and agree one or two action items, each with an owner.",
   };
   return (
     <section aria-label="Retro steps" className="card flex flex-wrap items-center justify-between gap-x-8 gap-y-5 p-5 md:px-6 print:hidden">
@@ -290,7 +290,7 @@ function Export({ code, room, headers, act }: { code: string; room: RetroView; h
         </div>
         <label className="flex items-center gap-2 text-sm text-ink-2">
           <input type="checkbox" className="h-4 w-4" checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} />
-          Also send me the QuickPoker newsletter (retro ideas and templates)
+          Also send me the QuickPoker newsletter (retro formats and facilitation tips)
         </label>
       </form>
       <p className="min-h-5 text-sm text-ink-2" aria-live="polite">{note ?? "The board is deleted 24 hours after its last use, so save it before then."}</p>
