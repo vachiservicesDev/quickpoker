@@ -50,6 +50,6 @@ npm test
 
 ## Deploy
 
-1. Create a Supabase project and run the files in `supabase/migrations/` in order (enable the `pg_cron` extension first if your project needs it).
+1. QuickPoker shares the Vachi Supabase project with the Vachi portal and website. Its tables live in their own `quickpoker` schema, so they never touch the portal's or the website's tables in `public`. Run the files in `supabase/migrations/` in order (they also turn on `pg_cron`), then add `quickpoker` under Settings → Data API → Exposed schemas in the Supabase dashboard.
 2. In Vercel, set the variables from `.env.example`.
 3. Deploy.

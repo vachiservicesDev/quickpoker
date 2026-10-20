@@ -1,10 +1,10 @@
 -- One round trip per save attempt. If someone else saved first, the function
 -- hands back the current room so the server can re-apply the change straight
 -- away, instead of spending a second round trip re-reading it.
-create or replace function public.qp_update_room(p_code text, p_expected integer, p_state jsonb)
+create or replace function quickpoker.qp_update_room(p_code text, p_expected integer, p_state jsonb)
 returns table (ok boolean, version integer, kind text, state jsonb)
 language plpgsql
-set search_path = public
+set search_path = quickpoker
 as $$
 #variable_conflict use_column
 begin
@@ -19,8 +19,8 @@ begin
 end;
 $$;
 
-revoke all on function public.qp_update_room(text, integer, jsonb) from public, anon, authenticated;
-grant execute on function public.qp_update_room(text, integer, jsonb) to service_role;
+revoke all on function quickpoker.qp_update_room(text, integer, jsonb) from public, anon, authenticated;
+grant execute on function quickpoker.qp_update_room(text, integer, jsonb) to service_role;
 
 -- The busiest clicks (a poker vote, a new retro card, a retro vote) are applied
 -- here, under a row lock. When a whole team clicks in the same second, the
@@ -28,20 +28,20 @@ grant execute on function public.qp_update_room(text, integer, jsonb) to service
 -- and retrying. The rules mirror src/lib/poker.ts and src/lib/retro.ts, which
 -- also run first in the app so people get the same friendly errors.
 -- Errors are raised as 'qp:<http status>:<message>'.
-create or replace function public.qp_apply_op(p_code text, p_op jsonb)
+create or replace function quickpoker.qp_apply_op(p_code text, p_op jsonb)
 returns table (new_version integer, new_state jsonb)
 language plpgsql
-set search_path = public
+set search_path = quickpoker
 as $$
 declare
-  r public.rooms%rowtype;
+  r quickpoker.rooms%rowtype;
   s jsonb;
   actor text := p_op->>'actor';
   idx integer;
   used integer;
   pos bigint;
 begin
-  select * into r from public.rooms where code = p_code for update;
+  select * into r from quickpoker.rooms where code = p_code for update;
   if not found then
     raise exception 'qp:404:This room doesn''t exist. Rooms are deleted 24 hours after their last use.';
   end if;
@@ -122,10 +122,10 @@ begin
     raise exception 'qp:400:Unknown action.';
   end case;
 
-  update public.rooms set state = s, version = r.version + 1, last_active_at = now() where code = p_code;
+  update quickpoker.rooms set state = s, version = r.version + 1, last_active_at = now() where code = p_code;
   return query select r.version + 1, s;
 end;
 $$;
 
-revoke all on function public.qp_apply_op(text, jsonb) from public, anon, authenticated;
-grant execute on function public.qp_apply_op(text, jsonb) to service_role;
+revoke all on function quickpoker.qp_apply_op(text, jsonb) from public, anon, authenticated;
+grant execute on function quickpoker.qp_apply_op(text, jsonb) to service_role;

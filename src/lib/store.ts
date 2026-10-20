@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
 export interface RoomRecord<S = unknown> {
   code: string;
@@ -82,8 +82,14 @@ export interface RoomStore {
   unsubscribeLead(token: string): Promise<boolean>;
 }
 
+// QuickPoker shares a Supabase project with the Vachi portal and website, so its
+// tables live in their own "quickpoker" schema (supabase/migrations/0000).
+function connect(url: string, key: string) {
+  return createClient(url, key, { auth: { persistSession: false }, db: { schema: "quickpoker" } });
+}
+
 class SupabaseStore implements RoomStore {
-  constructor(private db: SupabaseClient) {}
+  constructor(private db: ReturnType<typeof connect>) {}
 
   async get<S>(code: string) {
     const { data, error } = await this.db.from("rooms").select("code, kind, state, version").eq("code", code).maybeSingle();
@@ -287,7 +293,7 @@ export function getStore(): RoomStore {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (url && key) {
-    g.__qpStore = new SupabaseStore(createClient(url, key, { auth: { persistSession: false } }));
+    g.__qpStore = new SupabaseStore(connect(url, key));
   } else if (process.env.NODE_ENV !== "production" || process.env.QP_MEMORY_STORE === "1") {
     g.__qpStore = new MemoryStore();
   } else {
