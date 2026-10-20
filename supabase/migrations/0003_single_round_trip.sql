@@ -2,11 +2,11 @@
 -- 100-team burst test.
 
 -- Who's online, as { participantId: lastSeenMillis }.
-create or replace function public.qp_presence(p_code text)
+create or replace function quickpoker.qp_presence(p_code text)
 returns jsonb
 language sql
 stable
-set search_path = public
+set search_path = quickpoker
 as $$
   select coalesce(jsonb_object_agg(participant_id, (extract(epoch from last_seen) * 1000)::bigint), '{}'::jsonb)
     from presence where room_code = p_code;
@@ -16,52 +16,52 @@ $$;
 -- When nothing changed since p_since, state and presence come back null.
 -- With p_beat, records that the viewer is still here, but only if their
 -- secret hash matches, so nobody can mark someone else as online.
-create or replace function public.qp_read_room(p_code text, p_since integer, p_viewer text, p_viewer_hash text, p_beat boolean)
+create or replace function quickpoker.qp_read_room(p_code text, p_since integer, p_viewer text, p_viewer_hash text, p_beat boolean)
 returns table (version integer, kind text, state jsonb, presence jsonb)
 language plpgsql
-set search_path = public
+set search_path = quickpoker
 as $$
 #variable_conflict use_column
 declare
-  r public.rooms%rowtype;
+  r quickpoker.rooms%rowtype;
 begin
-  select * into r from public.rooms where code = p_code;
+  select * into r from quickpoker.rooms where code = p_code;
   if not found then
     return;
   end if;
   if p_beat and p_viewer is not null and r.state->'participants'->p_viewer->>'secretHash' = p_viewer_hash then
-    insert into public.presence (room_code, participant_id, last_seen) values (p_code, p_viewer, now())
+    insert into quickpoker.presence (room_code, participant_id, last_seen) values (p_code, p_viewer, now())
       on conflict (room_code, participant_id) do update set last_seen = excluded.last_seen;
   end if;
   if p_since is not null and p_since = r.version then
     return query select r.version, r.kind, null::jsonb, null::jsonb;
   else
-    return query select r.version, r.kind, r.state, public.qp_presence(p_code);
+    return query select r.version, r.kind, r.state, quickpoker.qp_presence(p_code);
   end if;
 end;
 $$;
 
-revoke all on function public.qp_presence(text) from public, anon, authenticated;
-grant execute on function public.qp_presence(text) to service_role;
-revoke all on function public.qp_read_room(text, integer, text, text, boolean) from public, anon, authenticated;
-grant execute on function public.qp_read_room(text, integer, text, text, boolean) to service_role;
+revoke all on function quickpoker.qp_presence(text) from public, anon, authenticated;
+grant execute on function quickpoker.qp_presence(text) to service_role;
+revoke all on function quickpoker.qp_read_room(text, integer, text, text, boolean) from public, anon, authenticated;
+grant execute on function quickpoker.qp_read_room(text, integer, text, text, boolean) to service_role;
 
 -- Busy clicks, now also covering joins, and returning who's online so the
 -- response needs no second query. Replaces qp_apply_op from 0002.
-create or replace function public.qp_room_op(p_code text, p_op jsonb)
+create or replace function quickpoker.qp_room_op(p_code text, p_op jsonb)
 returns table (new_version integer, new_state jsonb, new_presence jsonb)
 language plpgsql
-set search_path = public
+set search_path = quickpoker
 as $$
 declare
-  r public.rooms%rowtype;
+  r quickpoker.rooms%rowtype;
   s jsonb;
   actor text := p_op->>'actor';
   idx integer;
   used integer;
   pos bigint;
 begin
-  select * into r from public.rooms where code = p_code for update;
+  select * into r from quickpoker.rooms where code = p_code for update;
   if not found then
     raise exception 'qp:404:This room doesn''t exist. Rooms are deleted 24 hours after their last use.';
   end if;
@@ -74,10 +74,10 @@ begin
     end if;
     s := jsonb_set(s, array['participants', actor], p_op->'participant');
     s := jsonb_set(s, '{order}', (s->'order') || to_jsonb(actor));
-    insert into public.presence (room_code, participant_id, last_seen) values (p_code, actor, now())
+    insert into quickpoker.presence (room_code, participant_id, last_seen) values (p_code, actor, now())
       on conflict (room_code, participant_id) do update set last_seen = excluded.last_seen;
-    update public.rooms set state = s, version = r.version + 1, last_active_at = now() where code = p_code;
-    return query select r.version + 1, s, public.qp_presence(p_code);
+    update quickpoker.rooms set state = s, version = r.version + 1, last_active_at = now() where code = p_code;
+    return query select r.version + 1, s, quickpoker.qp_presence(p_code);
     return;
   end if;
 
@@ -157,10 +157,10 @@ begin
     raise exception 'qp:400:Unknown action.';
   end case;
 
-  update public.rooms set state = s, version = r.version + 1, last_active_at = now() where code = p_code;
-  return query select r.version + 1, s, public.qp_presence(p_code);
+  update quickpoker.rooms set state = s, version = r.version + 1, last_active_at = now() where code = p_code;
+  return query select r.version + 1, s, quickpoker.qp_presence(p_code);
 end;
 $$;
 
-revoke all on function public.qp_room_op(text, jsonb) from public, anon, authenticated;
-grant execute on function public.qp_room_op(text, jsonb) to service_role;
+revoke all on function quickpoker.qp_room_op(text, jsonb) from public, anon, authenticated;
+grant execute on function quickpoker.qp_room_op(text, jsonb) to service_role;

@@ -1,7 +1,7 @@
 -- Everyone who asks to hear from Vachi Services: newsletter sign-ups, service
 -- inquiries, the Team plan waitlist and toolkit requests. Server-only, like
 -- every other table (Row Level Security on, no policies).
-create table public.leads (
+create table quickpoker.leads (
   id bigint generated always as identity primary key,
   kind text not null check (kind in ('newsletter', 'services', 'waitlist', 'toolkit', 'board')),
   email text not null check (char_length(email) between 3 and 254),
@@ -18,12 +18,12 @@ create table public.leads (
   created_at timestamptz not null default now()
 );
 
-create index leads_email_idx on public.leads (lower(email));
-alter table public.leads enable row level security;
+create index leads_email_idx on quickpoker.leads (lower(email));
+alter table quickpoker.leads enable row level security;
 
 -- Unconfirmed newsletter sign-ups with nothing else attached are dropped after 30 days.
 select cron.schedule(
   'quickpoker-drop-unconfirmed-leads',
   '17 3 * * *',
-  $$delete from public.leads where kind = 'newsletter' and confirmed_at is null and created_at < now() - interval '30 days'$$
+  $$delete from quickpoker.leads where kind = 'newsletter' and confirmed_at is null and created_at < now() - interval '30 days'$$
 );
